@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LMP - Local Music Player</title>
+
+<style>
+* {
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+body {
+  height:100vh;
+  background: radial-gradient(circle at top, #1db95422, #000);
+  color:white;
+  display:flex;
+  overflow:hidden;
+}
+
+/* Sidebar */
+.sidebar {
+  width:250px;
+  background:#121212;
+  padding:15px;
+  overflow-y:auto;
+  border-right:1px solid #222;
+}
+
+.sidebar h2 {
+  margin-bottom:10px;
+  color:#1db954;
+}
+
+.song {
+  padding:8px;
+  cursor:pointer;
+  border-radius:8px;
+  transition:0.3s;
+}
+
+.song:hover {
+  background:#1db95433;
+}
+
+/* Main */
+.main {
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  position:relative;
+}
+
+/* Canvas background */
+canvas {
+  position:absolute;
+  top:0;
+  left:0;
+  z-index:0;
+}
+
+/* Player card */
+.player {
+  z-index:2;
+  background:rgba(0,0,0,0.6);
+  backdrop-filter:blur(20px);
+  padding:20px;
+  border-radius:20px;
+  width:300px;
+  text-align:center;
+  box-shadow:0 0 40px #1db95444;
+}
+
+/* Disc */
+.disc {
+  width:120px;
+  height:120px;
+  border-radius:50%;
+  background: radial-gradient(circle, #333, #000);
+  margin:0 auto 15px;
+  animation: spin 5s linear infinite;
+  animation-play-state: paused;
+}
+
+.playing .disc {
+  animation-play-state: running;
+}
+
+@keyframes spin {
+  from {transform:rotate(0deg);}
+  to {transform:rotate(360deg);}
+}
+
+.song-title {
+  font-weight:bold;
+  margin-bottom:10px;
+}
+
+/* Controls */
+.controls button {
+  background:#1db954;
+  border:none;
+  margin:5px;
+  padding:10px;
+  border-radius:50%;
+  cursor:pointer;
+  transition:0.3s;
+}
+
+.controls button:hover {
+  transform:scale(1.2);
+}
+
+/* Progress */
+.progress-container {
+  width:100%;
+  height:5px;
+  background:#333;
+  margin-top:10px;
+  cursor:pointer;
+}
+
+.progress {
+  height:100%;
+  width:0%;
+  background:#1db954;
+}
+
+.time {
+  font-size:12px;
+  margin-top:5px;
+}
+
+.open-btn {
+  position:absolute;
+  top:20px;
+  right:20px;
+  background:#1db954;
+  border:none;
+  padding:10px;
+  border-radius:10px;
+  cursor:pointer;
+}
+</style>
+</head>
+
+<body>
+
+<div class="sidebar">
+  <h2>LMP 🎧</h2>
+  <div id="playlist"></div>
+</div>
+
+<div class="main">
+  <canvas id="visualizer"></canvas>
+
+  <button class="open-btn" id="openFolder">Open Music Folder</button>
+
+  <div class="player" id="player">
+    <div class="disc"></div>
+    <div class="song-title" id="songTitle">No song</div>
+
+    <div class="progress-container" id="progressContainer">
+      <div class="progress" id="progress"></div>
+    </div>
+
+    <div class="time">
+      <span id="current">0:00</span> / <span id="duration">0:00</span>
+    </div>
+
+    <div class="controls">
+      <button id="prev">⏮</button>
+      <button id="play">▶</button>
+      <button id="next">⏭</button>
+    </div>
+  </div>
+</div>
+
+<audio id="audio"></audio>
+
+<script>
+let audio = document.getElementById("audio");
+let playBtn = document.getElementById("play");
+let player = document.getElementById("player");
+
+let files = [];
+let currentIndex = 0;
+
+// Open folder
+document.getElementById("openFolder").onclick = async () => {
+  const dir = await window.showDirectoryPicker();
+  files = [];
+  document.getElementById("playlist").innerHTML = "";
+
+  for await (const entry of dir.values()) {
+    if (entry.name.endsWith(".mp3")) {
+      files.push(entry);
+
+      let div = document.createElement("div");
+      div.textContent = entry.name;
+      div.className = "song";
+      div.onclick = () => loadSong(files.indexOf(entry));
+      document.getElementById("playlist").appendChild(div);
+    }
+  }
+
+  if(files.length) loadSong(0);
+};
+
+// Load
+async function loadSong(i){
+  currentIndex = i;
+  let file = await files[i].getFile();
+  audio.src = URL.createObjectURL(file);
+  document.getElementById("songTitle").textContent = file.name;
+  audio.play();
+  playBtn.textContent = "⏸";
+  player.classList.add("playing");
+}
+
+// Play/pause
+playBtn.onclick = () => {
+  if(audio.paused){
+    audio.play();
+    playBtn.textContent = "⏸";
+    player.classList.add("playing");
+  } else {
+    audio.pause();
+    playBtn.textContent = "▶";
+    player.classList.remove("playing");
+  }
+};
+
+// Next / Prev
+document.getElementById("next").onclick = () => loadSong((currentIndex+1)%files.length);
+document.getElementById("prev").onclick = () => loadSong((currentIndex-1+files.length)%files.length);
+
+// Progress
+audio.ontimeupdate = () => {
+  let p = (audio.currentTime/audio.duration)*100;
+  document.getElementById("progress").style.width = p+"%";
+
+  document.getElementById("current").textContent = format(audio.currentTime);
+  document.getElementById("duration").textContent = format(audio.duration||0);
+};
+
+function format(s){
+  let m = Math.floor(s/60);
+  let sec = Math.floor(s%60);
+  return m+":"+(sec<10?"0"+sec:sec);
+}
+
+// Seek
+document.getElementById("progressContainer").onclick = e => {
+  let w = e.currentTarget.clientWidth;
+  audio.currentTime = (e.offsetX/w)*audio.duration;
+};
+
+// Auto next
+audio.onended = () => document.getElementById("next").click();
+
+/* PARTICLE VISUALIZER */
+const canvas = document.getElementById("visualizer");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let particles = [];
+
+for(let i=0;i<100;i++){
+  particles.push({
+    x:Math.random()*canvas.width,
+    y:Math.random()*canvas.height,
+    r:Math.random()*2+1,
+    d:Math.random()*100
+  });
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = "#1db954";
+  particles.forEach(p=>{
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctx.fill();
+
+    p.y += Math.sin(p.d)*0.5;
+    p.x += Math.cos(p.d)*0.5;
+  });
+  requestAnimationFrame(draw);
+}
+
+draw();
+</script>
+
+</body>
+</html>
