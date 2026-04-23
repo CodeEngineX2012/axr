@@ -1,5 +1,7 @@
-# AXON
+# AXR
 *built by Skyzen Labs*
--A chat system built for secure communication in Local Area Networks (LAN) for businesses, corporate offices and more.
 
-*Security. Communication. Efficiency.*
+- A CLI for development, having fun and wasting time...
+- Has useful LAN tools for Home Netowrks, Office Networks etc.
+
+Open Source! But I must get credit!
